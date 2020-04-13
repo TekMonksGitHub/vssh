@@ -1,5 +1,5 @@
 {
-    "shell":"C:/Windows/System32/cmd.exe",
+    "shell":["C:/Windows/System32/cmd.exe"],
     "port":8329,
     "host":"::"
 }

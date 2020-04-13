@@ -12,15 +12,15 @@ const crypt = require(`${__dirname}/lib/crypt`);
 main();
 
 function main() {
-    const args = process.argv.slice(2);
 
-    if (args.length < 1) {
-        console.log("Usage: vssh <ip> [optional: port]");
-        console.log("If port is not specified then 8329 is assumed");
+    const args = process.argv.slice(2);
+    if (args.length < 3) {
+        console.log("Usage: vssh <user id> <password> <ip> [optional: port]");
         process.exit(1);
     }
 
-    const host = args[0]; const port = (args.length == 1) ? 8329 : args[1];
+    const host = args[2]; const port = (args.length == 4) ? args[3] : 8329;
+    const upw = `${encodeURI(args[0])}&${encodeURI(args[1])}`;
 
     let noReply = true;
 
@@ -33,7 +33,10 @@ function main() {
         vsshd.once("data", chunk => {
             try {
                 const dataIn = crypt.decrypt(chunk, aesKey);
-                if (JSON.parse(dataIn) == "OK") letsTalk(vsshd, aesKey);
+                if (JSON.parse(dataIn) == "OK") {
+                    vsshd.write(crypt.encrypt(upw, aesKey));
+                    letsTalk(vsshd, aesKey);
+                }
                 else {
                     console.error("Key exchange failed.");
                     vsshd.end(); vsshd.destroy(); 
