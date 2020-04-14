@@ -63,18 +63,18 @@ function _runShell(client, upw, aesKey) {
 
     console.log(`Access granted: ${_getClientAddr(client)}, user: ${uid}.`);
 
-    let shell = launchShell(uid, pw, client, aesKey);
+    let shell = launchShell(uid, pw, client, aesKey); let dontRespawn = false;
     shell.on("close", code => {
         if (code == 0) {shellExited = true; client.end(); client.destroy(); console.log(`Closed ${_getClientAddr(client)}, user: ${uid}.`)}
-        else if (conf.respawnShellOnError) {
+        else if (conf.respawnShellOnError && !dontRespawn) {
             console.error(`Respawning shell for ${_getClientAddr(client)}, code was: ${code}.`);
             shell = launchShell(uid, pw, client, aesKey);    // respawn on errors 
-        }
+        } else console.error(`Client error for ${_getClientAddr(client)}, shell forcibly closed.`);
     });
 
     client.on("data", data => io.readData(client, data, aesKey, data=>shell.stdin.write(data)));
-    client.on("close", _=>{if (!shellExited) shell.kill("SIGINT");});
-    client.on("error", _=>{if (!shellExited) shell.kill("SIGINT");});
+    client.on("close", _=>{if (!shellExited) {shell.kill("SIGINT"); dontRespawn=true;}});
+    client.on("error", _=>{if (!shellExited) {shell.kill("SIGINT"); dontRespawn=true;}});
 }
 
 function _performKeyExchange(client, publicKey, privateKey, callback) {
