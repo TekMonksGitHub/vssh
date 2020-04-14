@@ -27,41 +27,58 @@ function main() {
     ).on("error", err => {console.error(`VSSH Error: ${err}`); process.exit(1);});
 }
 
+const _getClientAddr = client => `${client.remoteAddress}:${client.remotePort}`;
+
 function _handleClient(client, publicKey, privateKey) {
-    const runCmd = (upw, aesKey) => {
-        let shellExited = false; const uid = decodeURI(upw.split("&")[0]); const pw = decodeURI(upw.split("&")[1]);
-
-        if (users && users[uid]!=pw) {
-            io.writeData(client, "Bad password", aesKey);
-            client.end(); client.destroy();
-            return;
-        }
-
-        const shell = spawn(path.resolve(conf.shell[0]), _addUIDAndPW(conf.shell.slice(1), uid, pw));
-        shell.stdout.on("data", data => io.writeData(client, data, aesKey));
-        shell.stderr.on("data", data => io.writeData(client, data, aesKey));
-        shell.on("close", _code => {shellExited = true; client.end(); client.destroy();});
-
-        client.on("data", data => io.readData(client, data, aesKey, data=>shell.stdin.write(data)));
-        client.on("close", _=>{if (!shellExited) shell.kill("SIGINT");});
-        client.on("error", _=>{if (!shellExited) shell.kill("SIGINT");});
-    }
-
     const letsTalk = aesKey => {
-        if (!aesKey) {console.error(`Key exchange failed for ${client.remoteAddress}`); client.end(); client.destroy(); return;}
+        if (!aesKey) {console.error(`Key exchange failed for ${_getClientAddr(client)}.`); client.end(); client.destroy(); return;}
 
         client.write(crypt.encrypt('"OK"', aesKey));    // tell client comm channels are open
 
         let cmdRunning = false;
         client.once("close", _=>{if (!cmdRunning) console.error("Client disconnected without command.")});
         client.once("error", err=>{if (!cmdRunning) {console.error(`Client error before command ${err}`); client.end(); client.destroy();}});
-        client.once("data", data => {cmdRunning = true; runCmd(crypt.decrypt(data, aesKey), aesKey)});
+        client.once("data", data => {cmdRunning = true; _runShell(client, crypt.decrypt(data, aesKey), aesKey)});
     };
 
     _performKeyExchange(client, publicKey, privateKey, letsTalk);
 }
 
+function _runShell(client, upw, aesKey) {
+    const launchShell = (uid, pw, client, aesKey) => {
+        const shell = spawn(path.resolve(conf.shell[0]), _addUIDAndPW(conf.shell.slice(1), uid, pw));
+        shell.stdout.on("data", data => io.writeData(client, data, aesKey));
+        shell.stderr.on("data", data => io.writeData(client, data, aesKey));
+        return shell;
+    }
+
+    let shellExited = false; const uid = decodeURI(upw.split("&")[0]); const pw = decodeURI(upw.split("&")[1]);
+
+    if (users && users[uid].toLowerCase() != crypt.hash(pw).toLowerCase()) {
+        io.writeData(client, "Bad password", aesKey);
+        client.end(); client.destroy();
+        console.log(`Access denied: ${_getClientAddr(client)}, user: ${uid}, bad password.`);
+        return;
+    }
+
+    console.log(`Access granted: ${_getClientAddr(client)}, user: ${uid}.`);
+
+    let shell = launchShell(uid, pw, client, aesKey);
+    shell.on("close", code => {
+        if (code == 0) {shellExited = true; client.end(); client.destroy(); console.log(`Closed ${_getClientAddr(client)}, user: ${uid}.`)}
+        else if (conf.respawnShellOnError) {
+            console.error(`Respawning shell for ${_getClientAddr(client)}, code was: ${code}.`);
+            shell = launchShell(uid, pw, client, aesKey);    // respawn on errors 
+        }
+    });
+
+    client.on("data", data => io.readData(client, data, aesKey, data=>shell.stdin.write(data)));
+    client.on("close", _=>{if (!shellExited) shell.kill("SIGINT");});
+    client.on("error", _=>{if (!shellExited) shell.kill("SIGINT");});
+}
+
 function _performKeyExchange(client, publicKey, privateKey, callback) {
+    console.log(`[access] ${_getClientAddr(client)} Protocol: ${client.remoteFamily}.`);
     client.write(publicKey);
     const errorHandler = err=>{console.error(`Error during key exchange: ${err}`); callback();}
     const eventemitterError = client.once("error", errorHandler);

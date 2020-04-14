@@ -57,8 +57,18 @@ function letsTalk(vsshd, aesKey) {
     vsshd.on("data", data => io.readData(vsshd, data, aesKey, data=>process.stdout.write(_addScreenEscapes(data))));
     vsshd.on("error", err => {console.error(`Error: ${err}\nClosing connection.`); vsshd.end(); vsshd.destroy();});
     vsshd.on("close", _=>process.exit(0));
-    process.stdin.on("data", data => io.writeData(vsshd, data, aesKey));
+    process.stdin.on("data", data => io.writeData(vsshd, _removeDosLineEndingsForWindows(data), aesKey));
     process.on("SIGINT", _=>{vsshd.end(); process.exit(1)});   // close connection
+}
+
+function _removeDosLineEndingsForWindows(data) {
+    if (process.platform != "win32") return data;
+
+    if (!Buffer.isBuffer(data)) data = Buffer.from(data);
+
+    const chkPos = data.length-2;
+    if (data[chkPos] == 13) data = Buffer.concat([data.slice(0, chkPos),data.slice(chkPos+1)]);
+    return data;
 }
 
 function _addScreenEscapes(data) {

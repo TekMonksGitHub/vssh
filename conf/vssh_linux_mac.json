@@ -1,5 +1,5 @@
 {
-    "shell":["C:/Windows/System32/cmd.exe"],
+    "shell":["/bin/bash","-l","-i"],
     "port":8329,
     "host":"::",
     "respawnShellOnError": true
