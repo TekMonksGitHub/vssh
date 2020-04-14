@@ -11,7 +11,7 @@ Local user repository for custom auth, using SHA512 for shadow passwords.
 # Usage - Server Side
 (1) Install node.js on server.  
 (2) Clone this repository.  
-(3) Modify port or host in `conf/vssh.json`. Clients use default port of 8329.
+(3) Modify port or host in `conf/vssh.json`. Clients use default port of 8329.  
 (4) Run daemon as `node vsshd.js`.  
 
 # Usage - Client Side
