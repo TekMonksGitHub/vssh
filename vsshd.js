@@ -54,7 +54,7 @@ function _runShell(client, upw, aesKey) {
 
     let shellExited = false; const uid = decodeURI(upw.split("&")[0]); const pw = decodeURI(upw.split("&")[1]);
 
-    if (users && users[uid].toLowerCase() != crypt.hash(pw).toLowerCase()) {
+    if (users && (!users[uid] || users[uid].toLowerCase() != crypt.hash(pw).toLowerCase())) {
         io.writeData(client, "Bad password", aesKey);
         client.end(); client.destroy();
         console.log(`Access denied: ${_getClientAddr(client)}, user: ${uid}, bad password.`);
