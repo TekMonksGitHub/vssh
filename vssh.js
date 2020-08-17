@@ -15,11 +15,12 @@ function main() {
 
     const args = process.argv.slice(2);
     if (args.length < 3) {
-        console.log("Usage: vssh <user id> <password> <ip> [optional: port]");
+        console.log("Usage: vssh <user id> <password> <ip> [optional: port] [optional: verbose]");
         process.exit(1);
     }
 
     const host = args[2]; const port = (args.length == 4) ? args[3] : 8329;
+    console.debug = args.length == 5 && args[4].toLowerCase() == "verbose"?console.debug:_=>{};  // disable debug if not verbose
     const upw = `${encodeURI(args[0])}&${encodeURI(args[1])}`;
 
     let noReply = true;

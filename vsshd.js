@@ -22,6 +22,8 @@ function main() {
 
     if (!conf.host) conf.host = "::";   // listen on all IPv4 and IPv6 interfaces
 
+    if (!conf.verbose) console.debug = _=>{};   // disable debug output
+
     tcpip.createServer(socket => _handleClient(socket, publicKey, privateKey)).listen(
         conf.port, conf.host, _=>console.log(`VSSH daemon listening on ${conf.host}:${conf.port}`)
     ).on("error", err => {console.error(`VSSH Error: ${err}`); process.exit(1);});
