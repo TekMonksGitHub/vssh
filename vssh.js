@@ -8,6 +8,8 @@ global.LOG = console;
 const tcpip = require("net");
 const crypto = require("crypto");
 const io = require(`${__dirname}/lib/io`);
+const _li = msg => LOG.info(`[VSSH] ${msg}`);
+const _le = msg => LOG.error(`[VSSH] ${msg}`);
 const crypt = require(`${__dirname}/lib/crypt`);
 
 main();
@@ -16,7 +18,7 @@ function main() {
 
     const args = process.argv.slice(2);
     if (args.length < 3) {
-        LOG.info("Usage: vssh <user id> <password> <ip> [optional: port] [optional: verbose]");
+        _li("Usage: vssh <user id> <password> <ip> [optional: port] [optional: verbose]");
         process.exit(1);
     }
 
@@ -40,24 +42,24 @@ function main() {
                     letsTalk(vsshd, aesKey);
                 }
                 else {
-                    LOG.error("Key exchange failed.");
+                    _le("Key exchange failed.");
                     vsshd.end(); vsshd.destroy(); 
                     process.exit(1);
                 }
             } catch (err) {
-                LOG.error(`Key exchange failed due to: ${err}`);
+                _le(`Key exchange failed due to: ${err}`);
                 vsshd.end(); vsshd.destroy(); 
                 process.exit(1);
             }
         });
     });
-    vsshd.once("timeout", _=> {if (noReply) {LOG.info("Couldn't connect."); process.exit(1);}});
-    vsshd.once("error", err => {LOG.error(`Error: ${err}\nClosing connection.`); vsshd.end(); vsshd.destroy();});
+    vsshd.once("timeout", _=> {if (noReply) {_li("Couldn't connect."); process.exit(1);}});
+    vsshd.once("error", err => {_le(`Error: ${err}\nClosing connection.`); vsshd.end(); vsshd.destroy();});
 }
 
 function letsTalk(vsshd, aesKey) {
     vsshd.on("data", data => io.readData(vsshd, data, aesKey, data=>process.stdout.write(_addScreenEscapes(data))));
-    vsshd.on("error", err => {LOG.error(`Error: ${err}\nClosing connection.`); vsshd.end(); vsshd.destroy();});
+    vsshd.on("error", err => {_le(`Error: ${err}\nClosing connection.`); vsshd.end(); vsshd.destroy();});
     vsshd.on("close", _=>process.exit(0));
     process.stdin.on("data", data => io.writeData(vsshd, _removeDosLineEndingsForWindows(data), aesKey));
     process.on("SIGINT", _=>{vsshd.end(); process.exit(1)});   // close connection

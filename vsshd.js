@@ -15,6 +15,10 @@ const conf = require(`${__dirname}/conf/vssh.json`);
 const _requireSafe = path => {try{return require(path);}catch (err){}}
 const users = _requireSafe(`${__dirname}/conf/users.json`);
 
+const _li = msg => LOG.info(`[VSSH] ${msg}`);
+const _le = msg => LOG.error(`[VSSH] ${msg}`);
+
+
 main();
 function main() {
     const keyOpts1 = {type: "spki",format: "pem"}; const keyOpts2 = {type: "pkcs8",format: "pem"};
@@ -26,21 +30,21 @@ function main() {
     if (!conf.verbose) console.debug = _=>{};   // disable debug output
 
     tcpip.createServer(socket => _handleClient(socket, publicKey, privateKey)).listen(
-        conf.port, conf.host, _=>LOG.info(`VSSH daemon listening on ${conf.host}:${conf.port}`)
-    ).on("error", err => {LOG.error(`VSSH Error: ${err}`); process.exit(1);});
+        conf.port, conf.host, _=>_li(`VSSH daemon listening on ${conf.host}:${conf.port}`)
+    ).on("error", err => {_le(`VSSH Error: ${err}`); process.exit(1);});
 }
 
 const _getClientAddr = client => `${client.remoteAddress}:${client.remotePort}`;
 
 function _handleClient(client, publicKey, privateKey) {
     const letsTalk = aesKey => {
-        if (!aesKey) {LOG.error(`Key exchange failed for ${_getClientAddr(client)}.`); client.end(); client.destroy(); return;}
+        if (!aesKey) {_le(`Key exchange failed for ${_getClientAddr(client)}.`); client.end(); client.destroy(); return;}
 
         client.write(crypt.encrypt('"OK"', aesKey));    // tell client comm channels are open
 
         let cmdRunning = false;
-        client.once("close", _=>{if (!cmdRunning) LOG.error("Client disconnected without command.")});
-        client.once("error", err=>{if (!cmdRunning) {LOG.error(`Client error before command ${err}`); client.end(); client.destroy();}});
+        client.once("close", _=>{if (!cmdRunning) _le("Client disconnected without command.")});
+        client.once("error", err=>{if (!cmdRunning) {_le(`Client error before command ${err}`); client.end(); client.destroy();}});
         client.once("data", data => {cmdRunning = true; _runShell(client, crypt.decrypt(data, aesKey), aesKey)});
     };
 
@@ -60,19 +64,19 @@ function _runShell(client, upw, aesKey) {
     if (users && (!users[uid] || users[uid].toLowerCase() != crypt.hash(pw).toLowerCase())) {
         io.writeData(client, "Bad password", aesKey);
         client.end(); client.destroy();
-        LOG.info(`Access denied: ${_getClientAddr(client)}, user: ${uid}, bad password.`);
+        _li(`Access denied: ${_getClientAddr(client)}, user: ${uid}, bad password.`);
         return;
     }
 
-    LOG.info(`Access granted: ${_getClientAddr(client)}, user: ${uid}.`);
+    _li(`Access granted: ${_getClientAddr(client)}, user: ${uid}.`);
 
     let shell = launchShell(uid, pw, client, aesKey); let dontRespawn = false;
     shell.on("close", code => {
-        if (code == 0) {shellExited = true; client.end(); client.destroy(); LOG.info(`Closed ${_getClientAddr(client)}, user: ${uid}.`)}
+        if (code == 0) {shellExited = true; client.end(); client.destroy(); _li(`Closed ${_getClientAddr(client)}, user: ${uid}.`)}
         else if (conf.respawnShellOnError && !dontRespawn) {
-            LOG.error(`Respawning shell for ${_getClientAddr(client)}, code was: ${code}.`);
+            _le(`Respawning shell for ${_getClientAddr(client)}, code was: ${code}.`);
             shell = launchShell(uid, pw, client, aesKey);    // respawn on errors 
-        } else LOG.error(`Client error for ${_getClientAddr(client)}, shell forcibly closed.`);
+        } else _le(`Client error for ${_getClientAddr(client)}, shell forcibly closed.`);
     });
 
     client.on("data", data => io.readData(client, data, aesKey, data=>shell.stdin.write(data)));
@@ -81,18 +85,18 @@ function _runShell(client, upw, aesKey) {
 }
 
 function _performKeyExchange(client, publicKey, privateKey, callback) {
-    LOG.info(`[access] ${_getClientAddr(client)} Protocol: ${client.remoteFamily}.`);
+    _li(`[access] ${_getClientAddr(client)} Protocol: ${client.remoteFamily}.`);
     client.write(publicKey);
-    const errorHandler = err=>{LOG.error(`Error during key exchange: ${err}`); callback();}
+    const errorHandler = err=>{_le(`Error during key exchange: ${err}`); callback();}
     const eventemitterError = client.once("error", errorHandler);
     client.once("data", chunk => {
         eventemitterError.removeListener("error", errorHandler);
         try {
             const aesKey = crypto.privateDecrypt(privateKey, chunk);
-            if (aesKey.length != 256) {LOG.error(`Error during key exchange, length.`);callback(); return;}
+            if (aesKey.length != 256) {_le(`Error during key exchange, length.`);callback(); return;}
             callback(aesKey);
         } catch (err) {
-            LOG.error(`Error during key exchange: ${err}`);
+            _le(`Error during key exchange: ${err}`);
             callback();
         }
     });
