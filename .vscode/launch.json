@@ -30,7 +30,7 @@
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}\\vssh.js",
-            "args": ["Rohit Kapoor", "DLT4TekMonks", "127.0.0.1"]
+            "args": ["Test User", "Test password", "127.0.0.1"]
         }
     ]
 }
